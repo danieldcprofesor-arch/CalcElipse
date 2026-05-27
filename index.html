@@ -49,7 +49,6 @@ h1{font-family:'Playfair Display',serif;font-size:2rem;color:#e2e8f0;margin-bott
 .canvas-wrap{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:10px;margin-bottom:15px;display:flex;justify-content:center}
 canvas{border-radius:6px;background:#111827;width:100%;height:auto;max-width:500px}
 
-/* Cuadrícula optimizada para 4 columnas (a, b, c, e) */
 .vals-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:15px}
 .val-box{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 4px;text-align:center}
 .vbn{font-family:'JetBrains Mono',monospace;font-size:16px;color:var(--accent2);font-weight:bold}
@@ -68,9 +67,9 @@ canvas{border-radius:6px;background:#111827;width:100%;height:auto;max-width:500
 <body>
 <div class="wrap">
 <header>
-  <div class="badge">App Móvil Corregida</div>
+  <div class="badge">Exportación Completa Habilitada</div>
   <h1>Analizador de Elipses</h1>
-  <p class="subtitle">Unidad Educativa Villa Cruz · Cobija</p>
+  <p class="subtitle">Unidad Educativa San Francisco de Asís · Cobija</p>
 </header>
 
 <div class="input-card">
@@ -153,16 +152,15 @@ function parseEllipse(raw){
     else F += parseFloat(tok) || 0;
   }
   
-  // Ajuste crucial: Pasar el término del miembro derecho al izquierdo de forma correcta
   F = F - rhs;
 
-  if(A===0 || C===0) throw new Error('Faltan coeficientes cuadráticos válidos (A o C).');
+  if(A===0 || C===0) throw new Error('Faltan coeficientes cuadráticos válidos.');
   if(A*C<=0) throw new Error('Los signos de x² e y² deben ser iguales.');
   if(Math.abs(A-C)<1e-9) throw new Error('Es una circunferencia (A = C).');
   
   const h=-D/(2*A), k=-E/(2*C);
   const rhs2=-F+(D*D)/(4*A)+(E*E)/(4*C);
-  if(rhs2<=0) throw new Error('La ecuación no corresponde a una elipse real o posee radios imaginarios.');
+  if(rhs2<=0) throw new Error('La elipse posee radios imaginarios o inexistentes.');
   
   return build(h,k,rhs2/A,rhs2/C);
 }
@@ -205,14 +203,12 @@ function renderResults(d){
   ban.className='type-tag '+(d.hor?'tag-h':'tag-v');
   document.getElementById('stdEq').textContent=d.stdEq;
 
-  // Modificado: Ahora incluye la columna para el valor de 'c' de forma explícita
   document.getElementById('valsGrid').innerHTML=`
     <div class="val-box"><div class="vbn">a</div><div class="vbl">Eje Mayor</div><div class="vbv">${fmt(d.a)}</div></div>
     <div class="val-box"><div class="vbn">b</div><div class="vbl">Eje Menor</div><div class="vbv">${fmt(d.b)}</div></div>
     <div class="val-box"><div class="vbn">c</div><div class="vbl">Dist. Focal</div><div class="vbv">${fmt(d.c)}</div></div>
     <div class="val-box"><div class="vbn">e</div><div class="vbl">Excent.</div><div class="vbv">${fmt(d.e)}</div></div>`;
 
-  // Modificado: Se añadieron las coordenadas de B1 y B2 explícitamente en una tarjeta dedicada
   document.getElementById('cardsGrid').innerHTML=`
     <div class="card"><div class="cl">Centro</div><div class="cv"><span class="co">${fc(d.h,d.k)}</span></div></div>
     <div class="card"><div class="cl">Vértices del Eje Mayor (V)</div><div class="cv">V₁=<span class="co">${fc(...d.vertices[0])}</span> | V₂=<span class="co">${fc(...d.vertices[1])}</span></div></div>
@@ -244,13 +240,55 @@ function drawEllipse(d){
   
   const dot=(x,y,col)=>{ const [px,py]=toC(x,y); ctx.beginPath(); ctx.arc(px,py,5,0,Math.PI*2); ctx.fillStyle=col; ctx.fill(); };
   dot(d.h,d.k,'#94a3b8'); d.vertices.forEach(v=>dot(...v,'#60a5fa')); d.foci.forEach(f=>dot(...f,'#f59e0b'));
-  d.exMinor.forEach(b=>dot(...b,'#34d399')); // Puntos del eje menor agregados al gráfico en verde
+  d.exMinor.forEach(b=>dot(...b,'#34d399'));
 }
 
+// NUEVA FUNCIÓN: Genera un lienzo unificado completo (Gráfico + Ficha de Datos) en la imagen descargada
 function exportPNG(){
-  const canvas=document.getElementById('cv');
-  const a=document.createElement('a'); a.href=canvas.toDataURL('image/png');
-  a.download=`elipse_${Date.now()}.png`; a.click();
+  const d=window._D; if(!d) return;
+  
+  const outCanvas = document.createElement('canvas');
+  outCanvas.width = 600;
+  outCanvas.height = 900; // Espacio vertical ampliado para albergar toda la información
+  const oCtx = outCanvas.getContext('2d');
+  
+  // Fondo de la tarjeta general
+  oCtx.fillStyle = '#0a0e1a'; oCtx.fillRect(0, 0, 600, 900);
+  
+  // Encabezado institucional
+  oCtx.fillStyle = '#60a5fa'; oCtx.font = 'bold 20px Helvetica'; oCtx.fillText('REPORTES DE GEOMETRÍA ANALÍTICA', 40, 45);
+  oCtx.fillStyle = '#94a3b8'; oCtx.font = '12px Helvetica'; oCtx.fillText(d.hor ? 'ELIPSE HORIZONTAL' : 'ELIPSE VERTICAL', 40, 68);
+  oCtx.fillStyle = '#ffffff'; oCtx.font = '15px monospace'; oCtx.fillText(`Ecuación: ${d.stdEq}`, 40, 95);
+  
+  // Clonar la gráfica del visor real e incrustarla limpiamente
+  const srcCanvas = document.getElementById('cv');
+  oCtx.drawImage(srcCanvas, 0, 120, 600, 400);
+  
+  // Separador visual estilizado
+  oCtx.strokeStyle = '#1e3a5f'; oCtx.lineWidth = 1;
+  oCtx.beginPath(); oCtx.moveTo(30, 540); oCtx.lineTo(570, 540); oCtx.stroke();
+  
+  // Dibujar tabla de parámetros y coordenadas descriptivas abajo
+  let textY = 575;
+  const drawDataLine = (title, content, color = '#60a5fa') => {
+    oCtx.fillStyle = '#94a3b8'; oCtx.font = 'bold 12px Helvetica'; oCtx.fillText(title.toUpperCase(), 40, textY);
+    oCtx.fillStyle = color; oCtx.font = 'bold 14px monospace'; oCtx.fillText(content, 220, textY);
+    textY += 40;
+  };
+
+  drawDataLine('Centro (C):', fc(d.h, d.k));
+  drawDataLine('Vértices (V):', `V1 = ${fc(...d.vertices[0])}   |   V2 = ${fc(...d.vertices[1])}`);
+  drawDataLine('Eje Menor (B):', `B1 = ${fc(...d.exMinor[0])}   |   B2 = ${fc(...d.exMinor[1])}`);
+  drawDataLine('Focos (F):', `F1 = ${fc(...d.foci[0])}   |   F2 = ${fc(...d.foci[1])}`);
+  drawDataLine('Semiejes:', `a = ${fmt(d.a)}   |   b = ${fmt(d.b)}   |   c = ${fmt(d.c)}`, '#ffffff');
+  drawDataLine('Excentricidad (e):', fmt(d.e), '#f59e0b');
+  drawDataLine('Lado Recto (LR):', fmt(d.lr), '#f59e0b');
+
+  // Descarga del archivo final unificado
+  const link = document.createElement('a');
+  link.href = outCanvas.toDataURL('image/png');
+  link.download = `Ficha_Elipse_${Date.now()}.png`;
+  link.click();
 }
 
 function exportPDF(){
@@ -259,10 +297,8 @@ function exportPDF(){
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
     
-    // Fondo estilizado completo del PDF
     pdf.setFillColor(10,14,26); pdf.rect(0,0,210,297,'F');
     
-    // Encabezado
     pdf.setFont('helvetica','bold'); pdf.setFontSize(16); pdf.setTextColor(96,165,250);
     pdf.text('ANALIZADOR DE ELIPSES PRO',105,20,{align:'center'});
     
@@ -270,14 +306,12 @@ function exportPDF(){
     pdf.text(d.hor ? 'Elipse Horizontal' : 'Elipse Vertical',105,28,{align:'center'});
     
     pdf.setFontSize(11); pdf.setTextColor(255,255,255);
-    pdf.text(`Ecuacion: ${d.stdEq}`,105,36,{align:'center'});
+    pdf.text(`Ecuación: ${d.stdEq}`,105,36,{align:'center'});
     
-    // Renderizado del Canvas gráfico sin deformación
     const gc=document.getElementById('cv');
     const gImg=gc.toDataURL('image/png');
     pdf.addImage(gImg,'PNG', 15, 45, 180, 120);
     
-    // Bloque de datos numéricos detallados completos
     pdf.setFontSize(11); pdf.setTextColor(148,163,184);
     let y = 180;
     const addLine = (label, value) => {
@@ -287,7 +321,7 @@ function exportPDF(){
     };
 
     addLine('Centro (C):', fc(d.h, d.k));
-    addLine('Vertices Eje Mayor (V):', `V1 = ${fc(...d.vertices[0])}  |  V2 = ${fc(...d.vertices[1])}`);
+    addLine('Vértices Eje Mayor (V):', `V1 = ${fc(...d.vertices[0])}  |  V2 = ${fc(...d.vertices[1])}`);
     addLine('Extremos Eje Menor (B):', `B1 = ${fc(...d.exMinor[0])}  |  B2 = ${fc(...d.exMinor[1])}`);
     addLine('Focos (F):', `F1 = ${fc(...d.foci[0])}  |  F2 = ${fc(...d.foci[1])}`);
     addLine('Semiejes fundamentales:', `a = ${fmt(d.a)}  |  b = ${fmt(d.b)}  |  c = ${fmt(d.c)}`);
